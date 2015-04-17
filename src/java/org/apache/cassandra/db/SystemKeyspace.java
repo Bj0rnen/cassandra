@@ -39,6 +39,7 @@ import org.apache.cassandra.cql3.QueryProcessor;
 import org.apache.cassandra.cql3.UntypedResultSet;
 import org.apache.cassandra.db.commitlog.ReplayPosition;
 import org.apache.cassandra.db.compaction.CompactionHistoryTabularData;
+import org.apache.cassandra.db.compaction.DateTieredCompactionStrategy;
 import org.apache.cassandra.db.compaction.LeveledCompactionStrategy;
 import org.apache.cassandra.db.composites.Composite;
 import org.apache.cassandra.db.filter.QueryFilter;
@@ -83,6 +84,7 @@ public final class SystemKeyspace
     public static final String SSTABLE_ACTIVITY = "sstable_activity";
     public static final String SIZE_ESTIMATES = "size_estimates";
     public static final String AVAILABLE_RANGES = "available_ranges";
+    public static final String SSTABLE_METADATA = "sstable_metadata";
 
     public static final CFMetaData Hints =
         compile(HINTS,
@@ -241,6 +243,22 @@ public final class SystemKeyspace
                         + "ranges set<blob>"
                         + ")");
 
+    private static final CFMetaData SSTableMetadata =
+        compile(SSTABLE_METADATA,
+                "week-long sstable metadata history",
+                "CREATE TABLE %s ("
+                + "keyspace_name text,"
+                + "table_name text,"
+                + "generation int,"
+                + "ancestors set<int>,"
+                + "size bigint,"
+                + "level int,"
+                + "min_timestamp timestamp,"
+                + "max_timestamp timestamp,"
+                + "PRIMARY KEY ((keyspace_name, table_name), generation))")
+                .defaultTimeToLive((int) TimeUnit.DAYS.toSeconds(7))
+                .compactionStrategyClass(DateTieredCompactionStrategy.class);
+
     private static CFMetaData compile(String name, String description, String schema)
     {
         return CFMetaData.compile(String.format(schema, name), NAME)
@@ -263,7 +281,8 @@ public final class SystemKeyspace
                                            CompactionHistory,
                                            SSTableActivity,
                                            SizeEstimates,
-                                           AvailableRanges));
+                                           AvailableRanges,
+                                           SSTableMetadata));
         return new KSMetaData(NAME, LocalStrategy.class, Collections.<String, String>emptyMap(), true, tables);
     }
 
@@ -1031,6 +1050,33 @@ public final class SystemKeyspace
         {
             throw new IOError(e);
         }
+    }
+
+    public static void addSSTable(String ksname,
+                                  String tableName,
+                                  int generation,
+                                  Set<Integer> ancestors,
+                                  long size,
+                                  int level,
+                                  long minTimestamp,
+                                  long maxTimestamp)
+    {
+        final String req = "INSERT INTO %s.%s (keyspace_name, table_name, generation, ancestors, size, level, min_timestamp, max_timestamp) "
+                           + "VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
+        executeInternal(String.format(req, NAME, SSTABLE_METADATA),
+                        ksname, tableName, generation, ancestors, size, level, ByteBufferUtil.bytes(minTimestamp), ByteBufferUtil.bytes(maxTimestamp));
+    }
+
+    public static UntypedResultSet getSSTableMetadataHistory(String keyspace, String table)
+    {
+        final String cql = String.format("SELECT * from %s.%s WHERE keyspace_name = ? AND table_name = ?", NAME, SSTABLE_METADATA);
+        return executeInternal(cql, keyspace, table);
+    }
+
+    public static UntypedResultSet getSSTableMetadata(String keyspace, String table, int generation)
+    {
+        final String cql = String.format("SELECT * from %s.%s WHERE keyspace_name = ? AND table_name = ? AND generation = ?", NAME, SSTABLE_METADATA);
+        return executeInternal(cql, keyspace, table, generation);
     }
 
 }
