@@ -25,6 +25,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import com.google.common.base.Predicate;
 import com.google.common.base.Predicates;
 import com.google.common.collect.*;
+
 import org.apache.cassandra.io.sstable.format.SSTableReader;
 import org.apache.cassandra.db.commitlog.ReplayPosition;
 import org.slf4j.Logger;
@@ -178,6 +179,8 @@ public class DataTracker
         {
             addNewSSTablesSize(Arrays.asList(sstable));
             notifyAdded(sstable);
+
+            SystemKeyspace.addSSTableMetadata(sstable, "Memtable flushed");
         }
     }
 
@@ -280,6 +283,9 @@ public class DataTracker
     // that they have been replaced by the provided sstables, which must have been performed by an earlier replaceReaders() call
     public void markCompactedSSTablesReplaced(Collection<SSTableReader> oldSSTables, Collection<SSTableReader> allReplacements, OperationType compactionType)
     {
+        for (SSTableReader replacement : allReplacements)
+            SystemKeyspace.addSSTableMetadata(replacement, compactionType.toString());
+
         removeSSTablesFromTracker(oldSSTables);
         releaseReferences(oldSSTables, false);
         notifySSTablesChanged(oldSSTables, allReplacements, compactionType);
