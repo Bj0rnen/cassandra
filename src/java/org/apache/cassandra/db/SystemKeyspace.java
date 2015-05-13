@@ -48,6 +48,7 @@ import org.apache.cassandra.dht.IPartitioner;
 import org.apache.cassandra.dht.Range;
 import org.apache.cassandra.dht.Token;
 import org.apache.cassandra.exceptions.ConfigurationException;
+import org.apache.cassandra.io.sstable.Component;
 import org.apache.cassandra.io.sstable.format.SSTableReader;
 import org.apache.cassandra.io.util.DataOutputBuffer;
 import org.apache.cassandra.locator.IEndpointSnitch;
@@ -256,6 +257,7 @@ public final class SystemKeyspace
                 + "min_timestamp bigint,"
                 + "max_timestamp bigint,"
                 + "origin text,"
+                + "arrival timestamp,"
                 + "PRIMARY KEY ((keyspace_name, table_name), generation))")
                 .defaultTimeToLive((int) TimeUnit.DAYS.toSeconds(7))
                 .compactionStrategyClass(DateTieredCompactionStrategy.class);
@@ -1055,11 +1057,12 @@ public final class SystemKeyspace
 
     public static void addSSTableMetadata(SSTableReader sstable, String origin)
     {
-        final String req = "INSERT INTO %s.%s (keyspace_name, table_name, generation, ancestors, size, level, min_timestamp, max_timestamp, origin) "
-                           + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
+        final String req = "INSERT INTO %s.%s (keyspace_name, table_name, generation, ancestors, size, level, min_timestamp, max_timestamp, origin, arrival) "
+                           + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
         executeInternal(String.format(req, NAME, SSTABLE_METADATA),
                         sstable.getKeyspaceName(), sstable.getColumnFamilyName(), sstable.descriptor.generation, sstable.getAncestors(),
-                        sstable.onDiskLength(), sstable.getSSTableLevel(), sstable.getMinTimestamp(), sstable.getMaxTimestamp(), origin);
+                        sstable.onDiskLength(), sstable.getSSTableLevel(), sstable.getMinTimestamp(), sstable.getMaxTimestamp(),
+                        origin, ByteBufferUtil.bytes(sstable.getCreationTimeFor(Component.DATA)));
     }
 
     public static UntypedResultSet getSSTableMetadataHistory(String keyspace, String table)
