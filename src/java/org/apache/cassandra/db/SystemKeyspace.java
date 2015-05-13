@@ -407,8 +407,9 @@ public final class SystemKeyspace
                 + "ancestors set<int>,"
                 + "size bigint,"
                 + "level int,"
-                + "min_timestamp timestamp,"
-                + "max_timestamp timestamp,"
+                + "min_timestamp bigint,"
+                + "max_timestamp bigint,"
+                + "origin text,"
                 + "PRIMARY KEY ((keyspace_name, table_name), generation))")
                 .defaultTimeToLive((int) TimeUnit.DAYS.toSeconds(7))
                 .compactionStrategyClass(DateTieredCompactionStrategy.class);
@@ -1372,19 +1373,13 @@ public final class SystemKeyspace
         }
     }
 
-    public static void addSSTable(String ksname,
-                                  String tableName,
-                                  int generation,
-                                  Set<Integer> ancestors,
-                                  long size,
-                                  int level,
-                                  long minTimestamp,
-                                  long maxTimestamp)
+    public static void addSSTableMetadata(SSTableReader sstable, String origin)
     {
-        final String req = "INSERT INTO %s.%s (keyspace_name, table_name, generation, ancestors, size, level, min_timestamp, max_timestamp) "
-                           + "VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
+        final String req = "INSERT INTO %s.%s (keyspace_name, table_name, generation, ancestors, size, level, min_timestamp, max_timestamp, origin) "
+                           + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
         executeInternal(String.format(req, NAME, SSTABLE_METADATA),
-                        ksname, tableName, generation, ancestors, size, level, ByteBufferUtil.bytes(minTimestamp), ByteBufferUtil.bytes(maxTimestamp));
+                        sstable.getKeyspaceName(), sstable.getColumnFamilyName(), sstable.descriptor.generation, sstable.getAncestors(),
+                        sstable.onDiskLength(), sstable.getSSTableLevel(), sstable.getMinTimestamp(), sstable.getMaxTimestamp(), origin);
     }
 
     public static UntypedResultSet getSSTableMetadataHistory(String keyspace, String table)
