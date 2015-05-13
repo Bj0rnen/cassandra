@@ -25,7 +25,6 @@ import java.util.concurrent.atomic.AtomicReference;
 import com.google.common.base.Predicate;
 import com.google.common.base.Predicates;
 import com.google.common.collect.*;
-
 import org.apache.cassandra.io.sstable.format.SSTableReader;
 import org.apache.cassandra.db.commitlog.ReplayPosition;
 import org.slf4j.Logger;
