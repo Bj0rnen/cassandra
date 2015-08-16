@@ -36,6 +36,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import org.apache.cassandra.config.DatabaseDescriptor;
+import org.apache.cassandra.db.SystemKeyspace;
 import org.apache.cassandra.db.compaction.OperationType;
 import org.apache.cassandra.io.sstable.format.SSTableReader;
 import org.apache.cassandra.io.util.FileUtils;
@@ -351,6 +352,8 @@ public class Tracker
         fail = updateSizeTracking(emptySet(), singleton(sstable), null);
         // TODO: if we're invalidated, should we notifyadded AND removed, or just skip both?
         fail = notifyAdded(sstable, fail);
+
+        SystemKeyspace.addSSTableMetadata(sstable, "Memtable flushed");
 
         if (!isDummy() && !cfstore.isValid())
             dropSSTables();
