@@ -414,7 +414,6 @@ public final class SystemKeyspace
                 + "origin text,"
                 + "arrival timestamp,"
                 + "PRIMARY KEY ((keyspace_name, table_name), generation))")
-                .defaultTimeToLive((int) TimeUnit.DAYS.toSeconds(7))
                 .compactionStrategyClass(DateTieredCompactionStrategy.class);
 
     private static CFMetaData compile(String name, String description, String schema)
